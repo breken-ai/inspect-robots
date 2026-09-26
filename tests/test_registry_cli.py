@@ -334,11 +334,49 @@ def test_live_view_tip_uses_local_and_headless_variants_with_quoted_log_dir(
     )
     remote = capsys.readouterr().out
     assert f"inspect-robots view {shlex.quote(str(log_dir))} --serve --host 0.0.0.0" in remote
-    assert "open http://[2001:db8::10]:8300/" in remote
+
+    cli._announce_live_view(
+        args,
+        resolved,
+        {"SSH_CONNECTION": "192.0.2.2 50123 192.0.2.10 22", "DISPLAY": ":0"},
+    )
+    assert "open http://192.0.2.10:8300/" in capsys.readouterr().out
 
     monkeypatch.setattr("socket.gethostname", lambda: "robot-host")
     cli._announce_live_view(args, resolved, {"SSH_CONNECTION": "malformed"})
     assert "open http://robot-host:8300/" in capsys.readouterr().out
+
+
+def test_live_view_tip_never_points_at_an_ipv6_address_the_ipv4_server_cannot_accept(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # The tip pairs its URL with `view --serve --host 0.0.0.0`, and that
+    # ThreadingHTTPServer listens on IPv4 only: an SSH session that arrived
+    # over IPv6 must not be sent to http://[<its IPv6 address>]:8300/.
+    args = cli.build_parser().parse_args(
+        ["run", "--task", "cubepick-reach", "--policy", "agent", "--embodiment", "cubepick"]
+    )
+    resolved = cli._ResolvedComponents(
+        None,
+        "agent",
+        "cli",
+        None,
+        "arm",
+        "cli",
+        None,  # type: ignore[arg-type]
+    )
+    monkeypatch.setattr("socket.gethostname", lambda: "robot-host")
+
+    cli._announce_live_view(
+        args,
+        resolved,
+        {"SSH_CONNECTION": "2001:db8::2 50123 2001:db8::10 22", "DISPLAY": ":0"},
+    )
+    remote = capsys.readouterr().out
+    assert "--serve --host 0.0.0.0" in remote
+    assert "2001:db8::10" not in remote
+    assert "open http://robot-host:8300/" in remote
 
 
 @pytest.mark.parametrize("command", ["run", "eval-set"])

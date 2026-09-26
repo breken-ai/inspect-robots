@@ -1570,9 +1570,11 @@ def _announce_live_view(
     url = ""
     if headless:
         fields = env.get("SSH_CONNECTION", "").split()
-        host = fields[2] if len(fields) == 4 else socket.gethostname()
-        if ":" in host and not (host.startswith("[") and host.endswith("]")):
-            host = f"[{host}]"
+        host = fields[2] if len(fields) == 4 else ""
+        # The suggested `--host 0.0.0.0` server listens on IPv4 only, so an
+        # IPv6 address from SSH_CONNECTION would name a URL nothing serves.
+        if not host or ":" in host:
+            host = socket.gethostname()
         url = f"; open http://{host}:8300/"
     print(
         _styled(
