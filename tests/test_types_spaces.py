@@ -306,7 +306,18 @@ def test_seconds_horizon_underflow_still_resolves_to_one_step() -> None:
 
 @pytest.mark.parametrize(
     ("max_seconds", "control_hz", "expected"),
-    [(1.1, 50.0, 55), (2.2, 100.0, 220), (8.3, 30.0, 249), (1.01, 10.0, 11)],
+    [
+        (1.1, 50.0, 55),
+        (2.2, 100.0, 220),
+        (8.3, 30.0, 249),
+        (1.01, 10.0, 11),
+        # Computed durations and reciprocal rates carry their own rounding
+        # residue; they must keep the budgets a bare ceil() already got right.
+        (1.1 + 2.2, 10.0, 33),
+        (1.1 + 2.2, 50.0, 165),
+        (3.0, 1 / 0.06, 50),
+        (0.1 + 0.2, 10.0, 3),
+    ],
 )
 def test_seconds_horizon_ceil_ignores_binary_float_rounding(
     max_seconds: float, control_hz: float, expected: int
